@@ -1,0 +1,203 @@
+# Pair Assignment by
+# Yubing Zhang, Songjia Wang
+
+# load dataset
+library(foreign)
+filnm = "Wegmans Survey 1"; 
+DataLab <- read.spss(paste(filnm,".sav",sep=""),to.data.frame=TRUE,use.value.labels=TRUE,trim_values=TRUE)
+Data <- read.spss(paste(filnm,".sav",sep=""),to.data.frame=TRUE,use.value.labels=FALSE)
+# take an overview of the data
+summary(DataLab)
+
+# ---------------------------------------1)
+# Depicting gender proportion
+popSex = c(0.87,.13); #desired population values for female and male
+genderPROP <- prop.table(table(Data$Question33Areyou)[2:3])
+genderPROP
+genderTest <- chisq.test(table(Data$Question33Areyou)[2:3],p = popSex)
+genderTest
+
+# p-value = 0.02235, this sample is different from the desired population 
+# if re-weighting
+w <- popSex/prop.table(table(Data$Question33Areyou)[2:3])
+w
+
+
+# ---------------------------------------2) 
+# Describing average attribute importance ratings
+# rename columns for attribute importance ratings
+names(Data)[47:59] <- c("NatImp","BldImp","CalImp","ConsImp","FatImp",'FruImp','OrgImp',
+                        'PrcImp','ProImp','RbstImp','CupImp','TasImp','TxtImp')
+names(DataLab)[47:59] <- c("NatImp","BldImp","CalImp","ConsImp","FatImp",'FruImp','OrgImp',
+                           'PrcImp','ProImp','RbstImp','CupImp','TasImp','TxtImp')
+# create indexing for attribute importance ratings
+AttrImp <- c("NatImp","BldImp","CalImp","ConsImp","FatImp",'FruImp','OrgImp',
+             'PrcImp','ProImp','RbstImp','CupImp','TasImp','TxtImp')
+# create full names for attribute importance ratings
+Attributes <- c("All Natural","Blended","Calorie","Consistency","Fat",'Fruit','Organic',
+                'Price','Protein','RbstFree','SideBySideCup','Taste','Texture')
+AttrImpDF <- Data[,47:59]
+# check levels
+levels(DataLab[[47]])
+# replace 'unsure' with NA
+for (i in AttrImp){
+  AttrImpDF[which(AttrImpDF[,i]==5),i] <- NA
+}
+
+# calculate Means and standard errors for attribute importance ratings
+AttrImpMeans = colMeans(AttrImpDF,na.rm=TRUE)
+AttrImpMeans
+AttrImpSE = apply(AttrImpDF,2,sd,na.rm=TRUE)/
+  sqrt(colSums(!is.na(AttrImpDF)))
+AttrImpSE
+AttrImpDFCal = data.frame(Attributes,AttrImpMeans,AttrImpSE)
+AttrImpDFCal
+write.csv(AttrImpDFCal,file = 'Ans.csv')
+
+# create error bar plots for attribute importance ratings
+library(ggplot2)
+dodge = position_dodge(width=.75) ## form constant dimensions positioning for all geom's
+# plot attribute importance ratings, and order in descending
+gi = ggplot(AttrImpDFCal,aes(y=AttrImpMeans,x=reorder(Attributes,-AttrImpMeans),
+                          ymax=AttrImpMeans+AttrImpSE,ymin=AttrImpMeans-AttrImpSE))
+gi + geom_bar(position=dodge,stat="identity",col=1,fill='coral1',width=.75) +
+  geom_errorbar(position=dodge,width=1) + 
+  labs(x="Attributes",y="Mean of Importance Ratings")
+
+
+# ---------------------------------------------4)
+# looking for column names for Question 24
+which(colnames(Data)=="Question24Allnatural" ) #106
+which(colnames(Data)=="Question24Texture" ) #114
+# rename columns for attribute importance ratings
+names(Data)[106:114] <- c("FageAllNatural","FageCalorieLevel","FageConsistency","FageFatLevel","FagePrice",
+                          'FageProteinLevel','FageSidebysideCup','FageTaste','FageTexture')
+names(DataLab)[106:114] <- c("FageAllNatural","FageCalorieLevel","FageConsistency","FageFatLevel","FagePrice",
+                          'FageProteinLevel','FageSidebysideCup','FageTaste','FageTexture')
+# pick out Question24
+FageRateDF <- Data[,106:114]
+# check levels
+levels(DataLab[[106]])
+
+# looking for column names for Question 30
+which(colnames(Data)=="Question30Allnatural" ) #132
+which(colnames(Data)=="Question30Texture" ) #141
+# rename columns for attribute importance ratings
+names(Data)[132:141] <- c("OikosAllNatural","OikosCalorieLevel","OikosConsistency","OikosFatLevel","OikosFruitonBottom",
+                          'OikosOrganic','OikosPrice','OikosProteinLevel','OikosTaste','OikosTexture')
+names(DataLab)[132:141] <- c("OikosAllNatural","OikosCalorieLevel","OikosConsistency","OikosFatLevel","OikosFruitonBottom",
+                             'OikosOrganic','OikosPrice','OikosProteinLevel','OikosTaste','OikosTexture')
+# pick out Question30
+OikosRateDF <- Data[,132:141]
+# check levels
+levels(DataLab[[132]])
+
+# Calculate means
+FageRateM <- colMeans(as.matrix(FageRateDF[,c(1,5,8)]),na.rm = TRUE)
+OikosRateM <- colMeans(as.matrix(OikosRateDF[,c(1,7,9)]),na.rm = TRUE)
+FODiff <- FageRateM-OikosRateM
+FOpval <- c(0.131,9.884e-06,1.142e-09)
+FOcomp <- cbind(FageRateM,OikosRateM,FODiff,FOpval)
+FOcomp
+write.csv(FOcomp,file = 'Ans.csv')
+
+# Conducting Paired T-Tests
+## Test on 'All Natural'
+## replace unsure with NA
+FageRateDF$FageAllNatural[FageRateDF$FageAllNatural==6] <- NA
+OikosRateDF$OikosAllNatural[OikosRateDF$OikosAllNatural==6] <- NA
+t.test(FageRateDF[,1],OikosRateDF[,1],paired=TRUE)
+## p-value = 0.131, no significant difference
+
+## Test on 'Price'
+## replace unsure with NA
+FageRateDF$FagePrice[FageRateDF$FagePrice==6] <- NA
+OikosRateDF$OikosPrice[OikosRateDF$OikosPrice==6] <- NA
+t.test(FageRateDF[,5],OikosRateDF[,7],paired=TRUE)
+## p-value = 9.884e-06, significant difference
+## check whose rate on price is higher
+colMeans(FageRateDF[5],na.rm=TRUE)-colMeans(OikosRateDF[7],na.rm=TRUE) #-0.1677956
+## Oikos has a higher rating on 'Price'
+
+## Test on 'Taste'
+## replace unsure with NA
+FageRateDF$FageTaste[FageRateDF$FageTaste==6] <- NA
+OikosRateDF$OikosTaste[OikosRateDF$OikosPrice==6] <- NA
+t.test(FageRateDF[,'FageTaste'],OikosRateDF[,'OikosTaste'],paired=TRUE)
+## p-value = 1.142e-09, significant difference
+## check whose rate on taste is higher
+colMeans(FageRateDF['FageTaste'],na.rm=TRUE)-colMeans(OikosRateDF['OikosTaste'],na.rm=TRUE) #0.3538779
+## Fage has a higher rating on 'Taste'
+
+
+# ----------------------------------------5)
+# create a new data frame for overall rating with usage situation idenfication
+AttrImpDF2 <- cbind(AttrImpDF,Data$Question12DoyouuseGreekYogurtforcooking)
+names(AttrImpDF2)[14] <- 'cooking'
+# check percentage
+cookPROP <- as.data.frame(prop.table(table(AttrImpDF2$cooking)))
+cookPROP
+write.csv(cookPROP,file = 'Ans.csv')
+
+# Calculate means
+cookRateM <- colMeans(as.matrix(AttrImpDF2[AttrImpDF2$cooking=='Yes',c(1,2,7,8)]),na.rm = TRUE)
+ncookRateM <- colMeans(as.matrix(AttrImpDF2[AttrImpDF2$cooking=='No ',c(1,2,7,8)]),na.rm = TRUE)
+Diff <- cookRateM-ncookRateM
+CookDiff <- cbind(cookRateM,ncookRateM,Diff)
+CookDiff
+write.csv(CookDiff,file = 'Ans.csv')
+
+# Between people who use GreekYogurt to cook and those don't, are there any difference in ratings 
+# for each of the four attributes?
+
+# T TESTS
+## Test on 'All Natural'
+t.test(as.matrix(AttrImpDF2[AttrImpDF2$cooking=='Yes','NatImp']),
+       as.matrix(AttrImpDF2[AttrImpDF2$cooking=='No ','NatImp']))
+# p-value = 0.03286, significant difference
+
+## Test on 'Organic'
+t.test(as.matrix(AttrImpDF2[AttrImpDF2$cooking=='Yes','OrgImp']),
+       as.matrix(AttrImpDF2[AttrImpDF2$cooking=='No ','OrgImp']))
+# p-value = 0.09288, not different
+
+## Test on 'Rbst'
+t.test(as.matrix(AttrImpDF2[AttrImpDF2$cooking=='Yes','RbstImp']),
+       as.matrix(AttrImpDF2[AttrImpDF2$cooking=='No ','RbstImp']))
+# p-value = 0.09754, not different
+
+## Test on 'Price'
+t.test(as.matrix(AttrImpDF2[AttrImpDF2$cooking=='Yes','PrcImp']),
+       as.matrix(AttrImpDF2[AttrImpDF2$cooking=='No ','PrcImp']))
+# p-value = 0.001461, significant difference
+cookPval <- c(0.03286,0.09288,0.09754,0.001461)
+CookDiff <- cbind(CookDiff,cookPval)
+write.csv(CookDiff,file = 'Ans.csv')
+
+# For people who use GreekYogurt to cook, which attribute do they value the most?
+cookRate <- AttrImpDF2[AttrImpDF2$cooking=='Yes',c(1,2,7,8)]
+for (i in colnames(cookRate)){
+  cookRate4[i] <- list(nrow(cookRate[which(cookRate[,i]==4),]))
+  cookRate3[i] <- list(nrow(cookRate[which(cookRate[,i]==3),]))
+  cookRate2[i] <- list(nrow(cookRate[which(cookRate[,i]==2),]))
+  cookRate1[i] <- list(nrow(cookRate[which(cookRate[,i]==1),]))
+}
+cookRateCount <- cbind(cookRate1,cookRate2,cookRate3,cookRate4)
+cookRateCount <- cookRateCount[-1,]
+cookRateCount <- t(cookRateCount)
+cookRateCount
+write.csv(cookRateCount,file = 'Ans.csv')
+
+
+# -------------------------------下面的不用管---------------------
+# calculate with for loop
+for (i in colnames(AttrImpDF2[c(1,2,7,8)])){
+  print(t.test(AttrImpDF2[AttrImpDF2$cooking=='Yes',i],AttrImpDF2[AttrImpDF2$cooking=='No ',i]))
+}
+
+
+
+
+
+
+

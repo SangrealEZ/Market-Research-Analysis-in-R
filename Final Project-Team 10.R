@@ -1,0 +1,297 @@
+rm(list = ls())
+setwd("/00Courses/03 Research/HW/05 Final Project")
+# load survey data
+load("/00Courses/03 Research/HW/05 Final Project/MKT412R - Final Analysis Case Data.Rdata")
+colnames(desmat) <- c('price','height','motion','style')
+# check product profile
+prodProfile <- desmat[1:16,] 
+# check gender 
+sum(genderD)/16 #294 girls
+sampsize-294 #706 boys
+# check age
+sum(ageD)/16 #512 2-year-olds
+sampsize-512 #488 3-year-olds
+
+###############################################################
+## Part B
+## Cluster analysis by individual partworths
+## calculate partworths for each respondent
+desmatf = cbind(rep(1,nrow(desmat)),desmat); ##add column for intercept
+partworths = matrix(nrow=sampsize,ncol=ncol(desmatf)) ## create a matrix to store individual partworths
+for(i in 1:sampsize){ #for each individual run the regression and fill in the matrix
+  partworths[i,]=lm(ratings~desmat,subset=ID==i)$coef
+} 
+colnames(partworths) = c("Intercept","Price","Size","Motion","Style")
+## clustering
+library(cluster)
+library(fpc)
+set.seed(12) 
+toclust = Fed[,c(7:23,30:60)]
+
+# looking for optimal number of clusters
+pm1 = pamk(na.omit(toclust),scaling=TRUE) 
+pm1$nc 
+# cluster = 2
+# calculate weighted sum of squares 
+wss <- NA
+for (i in 1:15) wss[i] <- sum(kmeans(na.omit(toclust), 
+                                     centers=i,nstart=2)$withinss)
+plot(1:15, wss, type="b", xlab="Number of Clusters",
+     ylab="Within groups sum of squares") 
+# cluster = 5 is the elbow
+
+# create 2 new kmeans clusters
+km1 = kmeans(na.omit(toclust),2,iter.max = 20, nstart=2) # k = 2
+km2 = kmeans(na.omit(toclust),5,iter.max = 20, nstart=2) # k = 5
+# plotting clusters
+plotClust = function(km,discPlot=FALSE){
+  nc = length(km$size)
+  if(discPlot){par(mfrow=c(2,2))}
+  else {par(mfrow=c(3,1))}
+  percsize = paste(1:nc," = ",format(km$size/sum(km$size)*100,digits=2),"%",sep="")
+  pie(km$size,labels=percsize,col=1:nc)
+  
+  if (nc > 2) {
+    clusplot(toclust, km$cluster, color=TRUE, shade=TRUE,
+             labels=2, lines=0,col.clus=nc:1); #plot clusters against principal components
+  } else {
+    clusplot(toclust, km$cluster, color=TRUE, shade=TRUE,
+             labels=2, lines=0,col.clus=1:nc); #plot clusters against principal components    
+  }
+  
+  if(discPlot){
+    plotcluster(toclust, km$cluster,col=km$cluster); #plot against discriminant functions ()
+  }
+  rng = range(km$centers)
+  dist = rng[2]-rng[1]
+  locs = km$centers+.05*dist*ifelse(km$centers>0,1,-1)
+  bm = barplot(km$centers,beside=TRUE,col=1:nc,main="Cluster Means",ylim=rng+dist*c(-.1,.1))
+  text(bm,locs,formatC(km$centers,format="f",digits=1))
+}
+par(mar = c(2,2,2,2))
+plotClust(km1)
+plotClust(km2)
+
+
+# the 4-segment solution looks very similar to the 3-segment solution
+# 2-segment solution was incorporated by the 3-segment solution
+# we will choose the 3-segment solution for now
+km1$centers # print means for the 3 segments
+
+# seg 1--'Hulk Racers'
+# They account for 50%. Product #4(1,1,0,0) fits them better($119.99, 26'', bouncing, racing).
+# seg 2--'Mini Rockers'
+# They account for 20%. Product #13(0,0,1,1) fits them better($139.99, 18'', rocking, glamorous).
+# seg 3--'Hulk Rockers'
+# They account for 30%. Product #15(0,1,1,1) fits them better($139.99, 26'', rocking, glamorous).
+# seg 2&3 are more similar
+
+
+###############################################################
+## Part C
+## Prior segment---aggregate, by gender, by age
+# run an aggregate regression to find average preferences
+summary(lm(ratings~desmat))
+# attr1(price) is the most influential; attr1-3 are significant,attr4(style) is not significant.
+# price--119.99, height--26'',motion--bouncing increases utility
+
+## segment by age
+summary(lm(ratings~desmat*ageD))
+# younger kids like 26'',bouncing more
+# age difference is not really significant
+summary(lm(ratings~desmat,subset = ageD==1))
+summary(lm(ratings~desmat,subset = ageD==0))
+
+## segment by gender
+summary(lm(ratings~desmat*genderD))
+# girls like $139.99, 26'', rocking, galmorous
+# all interactions are significant, indicating a significant difference by gender.
+# run separately for two categories
+summary(lm(ratings~desmat,subset=genderD==1)) # girls
+summary(lm(ratings~desmat,subset=genderD==0)) # boys
+# all coefficients are significant
+# girls are less price sensitive than boys,and they like 26'',rocking, glamorous
+# boys don't like rocking and glamorous.
+# best product for girls is #15(0,1,1,1), for boys is #2(1,0,0,0)
+# girls are like 'Hulk-Rockers', boys are closer to 'Hulk-Racers'
+summary(lm(ratings~desmat*ageD*genderD))
+# young girls would choose $139,18'',rocking,glamorous horse,impact on size is not significant
+
+###############################################################
+## Part D
+## Market Simulation
+# repeat individual partworths for 16 times for multiplication
+partworths.full = matrix(rep(partworths,each=16),ncol=5) 
+pratings = rowSums(desmatf*partworths.full) # predicted rating for each product profile
+finalratings = ifelse(is.na(ratings),pratings,ratings) # filling NAs
+# tranform final ratings into matrix
+simDecInput = matrix(finalratings,nrow=nprofiles); ##this has 16 rows for profiles and sampsize columns
+
+# create a function to compute market share
+simDec = function(inputmat,scen){
+  ##inputmat is the ratings matrix with rows as profiles and cols as ratings
+  ##secn is the list of products in the market for the scenario (these are rows in inputmat)
+  inmkt = inputmat[scen,]
+  max = apply(inmkt,2,max)
+  firstChoices = (inmkt>rep(max,each=length(scen))-.000000000001)
+  shares = firstChoices/rep(colSums(firstChoices),each=length(scen))
+  rowMeans(shares)
+}
+# create a function to calculate profit
+## inputmat and scen is as above. myprods are indicators of which prods are the firms,
+## prices are the prices for all products, vcosts are the variable costs
+## fcosts are the fixed costs for the firm (need to calculate in already the number of products)
+simProfit = function(inputmat,scen, myProds, prices, vcosts,fcosts,mktsize=1){
+  mktshr = simDec(inputmat,scen);
+  vprofit = mktshr * (prices-vcosts)*mktsize;
+  sum(vprofit[myProds])-fcosts
+}
+
+## 14 simulations
+## current scenario = scen0
+# Our competitor offers #7(0,1,1,0),($139.99, 26", bouncing, racing Horse)
+# We offer #5(0,0,1,0), ($139.99, 18", rocking, glamorous Horse)
+           #13(0,0,1,1),($139.99, 18", rocking, racing Horse)
+# if competitor lowers price, he would offer #8(1,1,1,0),($119.99, 26", bouncing, racing Horse)
+scen0 = c(7,5,13) # current scenario
+simDec0 = simDec(simDecInput,scen0) #market share#0.636 0.210 0.154
+simProf0 = simProfit(simDecInput,scen0,c(2,3),
+                     c(111.99,111.99,111.99),c(41,33,33),40000,4000) #profit = 75009.44
+scen0.2 = c(8,5,13) 
+simDec0.2 = simDec(simDecInput,scen0.2) #market share#0.950 0.026 0.024
+simProf0.2 = simProfit(simDecInput,scen0.2,c(2,3),
+                       c(95.99,111.99,111.99),c(41,33,33),40000,4000) #profit = -24202
+# #5 and #13 are very similar, we will replace one with new products
+## if we replace #5
+#replace #5 with #15(0,1,1,1),($139.99, 26", rocking, glamorous Horse)
+scen1 = c(7,13,15) 
+simDec1 = simDec(simDecInput,scen1) #market share#0.444 0.156 0.400
+simProf1 = simProfit(simDecInput,scen1,c(2,3),
+                     c(111.99,111.99,111.99),c(41,33,41),40000,4000) #profit = 122873.76
+scen1.2 = c(8,15,13) 
+simDec1.2 = simDec(simDecInput,scen1.2) #market share#0.772 0.203 0.025
+simProf1.2 = simProfit(simDecInput,scen1.2,c(2,3),
+                       c(95.99,111.99,111.99),c(41,33,41),40000,4000) #profit = 31238.88
+#replace #5 with #4(1,1,0,0),($119.99, 26", bouncing, racing Horse)
+scen2 = c(7,13,4) 
+simDec2 = simDec(simDecInput,scen2) #market share#0.124 0.150 0.726
+simProf2 = simProfit(simDecInput,scen2,c(2,3),
+                     c(111.99,111.99,95.99),c(41,33,29),40000,4000) #profit = 201932.96
+scen2.2 = c(8,13,4) 
+simDec2.2 = simDec(simDecInput,scen2.2) #market share#0.456 0.027 0.517
+simProf2.2 = simProfit(simDecInput,scen2.2,c(2,3),
+                       c(95.99,111.99,95.99),c(41,33,29),40000,4000) #profit = 107066.2
+## if we replace #13
+#replace #13 with #15(0,1,1,1),($139.99, 26", rocking, glamorous Horse)
+scen3 = c(7,5,15) 
+simDec3 = simDec(simDecInput,scen3) #market share#0.384 0.232 0.384
+simProf3 = simProfit(simDecInput,scen3,c(2,3),
+                     c(111.99,111.99,111.99),c(41,33,41),40000,4000) #profit = 142343.4
+scen3.2 = c(8,5,15) 
+simDec3.2 = simDec(simDecInput,scen3.2) #market share#0.766 0.032 0.202
+simProf3.2 = simProfit(simDecInput,scen3.2,c(2,3),
+                       c(95.99,111.99,111.99),c(41,33,41),40000,4000) #profit = 27470.64
+#replace #13 with #4(1,1,0,0),($119.99, 26", bouncing, racing Horse)
+scen4 = c(7,5,4) 
+simDec4 = simDec(simDecInput,scen4) #market share#0.128 0.139 0.733
+simProf4 = simProfit(simDecInput,scen4,c(2,3),
+                     c(111.99,111.99,95.99),c(41,33,29),40000,4000) #profit = 200333.1
+scen4.2 = c(8,5,4)
+simDec4.2 = simDec(simDecInput,scen4.2) #market share#0.451 0.032 0.517
+simProf4.2 = simProfit(simDecInput,scen4.2,c(2,3),
+                       c(95.99,111.99,95.99),c(41,33,29),40000,4000) #profit = 108646
+
+## if we add 2 new products
+scen5 = c(7,13,4,15) #add #15(0,1,1,1),($139.99, 26", rocking, glamorous Horse)
+simDec5 = simDec(simDecInput,scen5) #market share#0.033 0.117 0.559 0.291
+simProf5 = simProfit(simDecInput,scen5,c(2,3,4),
+                     c(111.99,111.99,95.99,111.99),c(41,33,29,41),60000,4000) #profit = 209389.3 
+
+scen5.2 = c(8,13,4,15) 
+simDec5.2 = simDec(simDecInput,scen5.2) #market share#0.276 0.025 0.501 0.198
+simProf5.2 = simProfit(simDecInput,scen5.2,c(2,3,4),
+                       c(95.99,111.99,95.99,111.99),c(41,33,29,41),60000,4000) #profit = 138371
+
+scen6 = c(7,5,4,15) #add #15(0,1,1,1),($139.99, 26", rocking, glamorous Horse)
+simDec6 = simDec(simDecInput,scen6) #market share#0.028 0.122 0.563 0.287
+simProf6 = simProfit(simDecInput,scen6,c(2,3,4),
+                     c(111.99,111.99,95.99,111.99),c(41,33,29,41),60000,4000) #profit = 210905.1 
+scen6.2 = c(8,5,4,15) #add #15(0,1,1,1),($139.99, 26", rocking, glamorous Horse)
+simDec6.2 = simDec(simDecInput,scen6.2) #market share#0.270 0.032 0.501 0.197
+simProf6.2 = simProfit(simDecInput,scen6.2,c(2,3,4),
+                       c(95.99,111.99,95.99,111.99),c(41,33,29,41),60000,4000) #profit = 140298.8 
+
+## plan A.
+# no matter competitor lowers his price or not, 
+# it's better to expand product line and offer 3 types of products(#4,#5,#15)
+# If competitor does not respond, this would bring the company a profit of $210905.1.
+# If competitor lowers his price, this would bring the company a profit of $140298.8.
+
+
+# if we segment the market by gender, we will get two more scenarios
+# use #2 to target boys and #15 to target girls 
+scen7 = c(7,2,15) # offer two products targeting at different gender
+simDec7 = simDec(simDecInput,scen7) #market share#0.027 0.669 0.304
+simProf7 = simProfit(simDecInput,scen7,c(2,3),c(111.99,95.99,111.99),c(41,21,41),40000,4000) 
+# profit = 246997.1
+
+scen7.2 = c(8,2,15) # competitor respond with a lower price
+simDec7.2 = simDec(simDecInput,scen7.2) #market share#0.350 0.447 0.203
+simProf7.2 = simProfit(simDecInput,scen7.2,c(2,3),c(95.99,95.99,111.99),c(41,21,41),40000,4000) 
+# profit = 151726
+
+## plan B.
+# segment the market by gender, and offer two different products(#2,#15)
+# compared to plan A, plan B will bring higher profit.
+# considering gender preference, we can name each segment:
+# girls---'Glamors' & boys---'Racers'
+
+## plan C.
+# 2 segments
+scen8 = c(7,4,15) 
+simDec8 = simDec(simDecInput,scen8) #market share#0.059 0.613 0.328
+simProf8 = simProfit(simDecInput,scen8,c(2,3),
+                       c(111.99,95.99,111.99),c(41,29,41),40000,4000) #profit = 217398.4
+
+scen8.2 = c(8,4,15) 
+simDec8.2 = simDec(simDecInput,scen8.2) #market share#0.301 0.501 0.198
+simProf8.2 = simProfit(simDecInput,scen8.2,c(2,3),
+                       c(95.99,95.99,111.99),c(41,29,41),40000,4000) #profit = 150472
+
+## summary
+productMix <- c(paste(scen0,collapse = '+'),
+                paste(scen0.2,collapse = '+'),
+                paste(scen1,collapse = '+'),
+                paste(scen1.2,collapse = '+'),
+                paste(scen2,collapse = '+'),
+                paste(scen2.2,collapse = '+'),
+                paste(scen3,collapse = '+'),
+                paste(scen3.2,collapse = '+'),
+                paste(scen4,collapse = '+'),
+                paste(scen4.2,collapse = '+'),
+                paste(scen5,collapse = '+'),
+                paste(scen5.2,collapse = '+'),
+                paste(scen6,collapse = '+'),
+                paste(scen6.2,collapse = '+'),
+                paste(scen7,collapse = '+'),
+                paste(scen7.2,collapse = '+'),
+                paste(scen8,collapse = '+'),
+                paste(scen8.2,collapse = '+'))
+
+profit <- c(simProf0,simProf0.2,simProf1,simProf1.2,simProf2,simProf2.2,simProf3,simProf3.2,simProf4,simProf4.2,
+            simProf5,simProf5.2,simProf6,simProf6.2,simProf7,simProf7.2,simProf8,simProf8.2)
+simulation <- cbind(productMix,profit)
+simulation
+
+# best strategy:
+# A) offer #2 & #15 at first, when competitor lowers his price, lower price for #15 ie provide #16
+simProf9 = simProfit(simDecInput,c(7,2,15),c(2,3),c(111.99,95.99,111.99),c(41,21,41),40000,4000) #246997.1
+simProf9.2 = simProfit(simDecInput,c(8,2,16),c(2,3),c(95.99,95.99,95.99),c(41,21,41),40000,4000) #172887.4
+# B) offer #3 & #13 & #15 at first, when competitor lowers his price, lower price for each
+simProf10 = simProfit(simDecInput,c(7,3,13,15),c(2,3,4),
+                       c(111.99,111.99,111.99,111.99),c(41,29,33,41),60000,4000) #227503.2
+simProf10.2 = simProfit(simDecInput,c(8,4,14,16),c(2,3,4),
+                       c(95.99,95.99,95.99,95.99),c(41,29,33,41),60000,4000) #184512.9
+# C) offer #4 & #15 at first, when competitor lowers his price, lower price for #15 ie provide #16
+simProf11 = simProfit(simDecInput,c(7,4,15) ,c(2,3),c(95.99,95.99,111.99),c(41,29,41),40000,4000) #217398.4
+simProf11.2 = simProfit(simDecInput,c(8,4,16) ,c(2,3),c(95.99,95.99,95.99),c(41,29,41),40000,4000) #179572.4
