@@ -213,7 +213,6 @@ valid8 # 4.666297
 #########################
 # Which attribute is most influential
 ######################### 
-# 辣鸡
 # Key measure = 'UNITS'
 # linear?
 summary(lm(UNITS~. , data = transJoinCustI))
@@ -232,11 +231,8 @@ round(coef(leapsModelsU, bestBICU),3)
 library('earth')
 earthFitU = earth(UNITS~. , data = na.omit(transJoinCustI))
 plotmo(earthFitU)
-# nah..
-# conclu...辣鸡
 
 #####################################################
-# 辣鸡
 # Key measure = 'WEEKS'
 # linear?
 summary(lm(WEEKS~., data = transJoinCustI))
@@ -248,19 +244,14 @@ leapsModelsW = regsubsets(WEEKS~.^2, data = transJoinCustI[,c(3,4,7,8,13:19)], m
 subsetSummaryW = summary(leapsModelsW)
 bestBICW = which.min(subsetSummaryW$bic)
 round(coef(leapsModelsW, bestBICW),3)
-# nah...
 # non-linear?
 library('earth')
 earthFitW = earth(WEEKS~. , data = na.omit(transJoinCustI))
 plotmo(earthFitW)
-# nah..
-# conclu...辣鸡
-
 
 #########################
 # Predict on entire dataset
 ######################### 
-# 辣鸡
 set.seed(1)
 isTraining = runif(nrow(transJoinCustI)) < 0.8
 trainingData = subset(transJoinCustI, isTraining)
@@ -287,7 +278,6 @@ prop.table(table(surJoinTrans$EndPoint))
 
 #####################################################
 # Clustering
-# 辣鸡
 library(cluster) 
 library(fpc)
 
