@@ -1,5 +1,4 @@
-# Pair Assignment by
-# Yubing Zhang, Songjia Wang
+# Wegmans - Customer Preferences for Greek Yogurt Survey 
 
 # load dataset
 library(foreign)
@@ -188,12 +187,6 @@ cookRateCount <- t(cookRateCount)
 cookRateCount
 write.csv(cookRateCount,file = 'Ans.csv')
 
-
-# -------------------------------下面的不用管---------------------
-# calculate with for loop
-for (i in colnames(AttrImpDF2[c(1,2,7,8)])){
-  print(t.test(AttrImpDF2[AttrImpDF2$cooking=='Yes',i],AttrImpDF2[AttrImpDF2$cooking=='No ',i]))
-}
 
 
 
