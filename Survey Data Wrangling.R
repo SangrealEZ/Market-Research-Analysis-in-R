@@ -109,7 +109,7 @@ chisq.test(spssDataLab$resolve,spssDataLab$oq)
 t.test(spssData$oq[spssDataLab$resolve=="Yes"],spssData$oq[spssDataLab$resolve=="No"],)
 
 ############################################################
-##Some extra tips you will probably find useful for homework
+##Some extra tips 
 ############################################################
 
 #if you want to recode some columns of to a different value
