@@ -1,3 +1,7 @@
+# New product launch decision / strategy
+# Identify target customer - market segmentation
+# Determine product portfolio & pricing - market simulation
+
 rm(list = ls())
 setwd("/00Courses/03 Research/HW/05 Final Project")
 # load survey data
