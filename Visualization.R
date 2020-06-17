@@ -1,8 +1,3 @@
-############################################################
-## 
-## MKT412 Lab3 R plot sample
-##
-############################################################
 # Preparations works
 rm(list=ls())
 # set working directory, i.e. where your files and data are located
