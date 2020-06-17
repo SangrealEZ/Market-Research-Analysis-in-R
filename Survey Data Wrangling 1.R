@@ -1,8 +1,3 @@
-############################################################
-## 
-## MKT412 Lab2 R Tutorial
-##
-############################################################
 # Preparations before you do anything
 # remove everything in the working environment
 rm(list = ls())
