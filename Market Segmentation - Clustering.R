@@ -1,6 +1,6 @@
 ############ Preparation works ############
 rm(list=ls())
-# set working directory, i.e. where your files and data are located
+# set working directory
 setwd("/00Courses/03 Research/Lab/Lab 4 Regression and Cluster Analysis")
 # call the library for getting data from other programs
 library(foreign)
